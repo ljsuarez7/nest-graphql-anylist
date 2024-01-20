@@ -3,6 +3,7 @@ import { CreateItemInput, UpdateItemInput } from './dto/inputs';
 import { Item } from './entities/item.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
+import { User } from 'src/users/entities/user.entity';
 
 @Injectable()
 export class ItemsService {
@@ -12,33 +13,87 @@ export class ItemsService {
     private readonly itemsRepository: Repository<Item>
   ){}
 
-  async create(createItemInput: CreateItemInput): Promise<Item> {
-    const newItem = this.itemsRepository.create(createItemInput);
+  async create(createItemInput: CreateItemInput, user: User): Promise<Item> {
+    const newItem = this.itemsRepository.create({...createItemInput, user}); //desestructuramos y añadimos el usuario
     return await this.itemsRepository.save(newItem);
   }
 
-  async findAll(): Promise<Item[]> {
-    // TODO: filtrar, paginar, por usuario...
-    return this.itemsRepository.find();
+  async findAll(user: User): Promise<Item[]> {
+    // TODO: filtrar, paginar, por usuario...    
+    return this.itemsRepository.find({
+      where: {
+        user: {
+          id: user.id
+        }
+      }
+    });
   }
 
-  async findOne(id: string): Promise<Item> {
-    const item = this.itemsRepository.findOneBy({id});
+  async findOne(id: string, user: User): Promise<Item> {
+    const item = await this.itemsRepository.findOneBy({
+      id,
+      user: {
+        id: user.id
+      }
+    });
     if(!item) throw new NotFoundException(`Item with id: ${id} not found`);
+    // item.user = user; //Con esto cargamos la info del user en la consulta, pero con el lazy en la propiedad en el entity hace lo mismo
     return item;
   }
 
-  async update(id: string, updateItemInput: UpdateItemInput): Promise<Item> {
+  async update(id: string, updateItemInput: UpdateItemInput, user: User): Promise<Item> {
+    await this.findOne(id, user);
+    // const item = await this.itemsRepository.preload({...updateItemInput, user}); //Esto seria si no tenemos el lazy puesto en el entity, para poder cargar los datos del user
     const item = await this.itemsRepository.preload(updateItemInput);
     if(!item) throw new NotFoundException(`Item with id: ${id} not found`);
     return this.itemsRepository.save(item);
   }
 
-  async remove(id: string): Promise<Item> {
+  async remove(id: string, user: User): Promise<Item> {
     //Lo ideal es siempre hacer eliminación mediante una actualizacion de un estado y no borrado fisico de la BD
     //TODO: soft delete, integridad referencial
-    const item = await this.findOne(id);
+    const item = await this.findOne(id, user);
     await this.itemsRepository.remove(item);
     return {...item, id}; //Esto lo tenemos que hacer porque se pierde el id al eliminarlo y necesitamos mandarselo al resolver
   }
+
+  async itemsCountByUser(user: User): Promise<number>{
+    return this.itemsRepository.count({
+      where: {
+        user: {
+          id: user.id
+        }
+      }
+    })
+  }
+
+  //METODOS SIN FILTRAR POR USUARIO, POR EJEMPLO PARA UN ADMIN QUE TENGA Q VERLO TODO
+  //SE PODRIA MIRAR DE HACER QUE SI EL USER ES ADMIN QUE VEA TODO Y SINO FILTRAR
+
+  //BUSCAR TODOS LOS ITEMS DE LA BD
+  // async findAll(): Promise<Item[]> {
+  //   // TODO: filtrar, paginar, por usuario...    
+  //   return this.itemsRepository.find();
+  // }
+
+  // async findOne(id: string): Promise<Item> {
+  //   const item = this.itemsRepository.findOneBy({id});
+  //   if(!item) throw new NotFoundException(`Item with id: ${id} not found`);
+  //   return item;
+  // }
+
+  // async update(id: string, updateItemInput: UpdateItemInput): Promise<Item> {
+  //   const item = await this.itemsRepository.preload(updateItemInput);
+  //   if(!item) throw new NotFoundException(`Item with id: ${id} not found`);
+  //   return this.itemsRepository.save(item);
+  // }
+
+  // async remove(id: string): Promise<Item> {
+  //   //Lo ideal es siempre hacer eliminación mediante una actualizacion de un estado y no borrado fisico de la BD
+  //   //TODO: soft delete, integridad referencial
+  //   const item = await this.findOne(id);
+  //   await this.itemsRepository.remove(item);
+  //   return {...item, id}; //Esto lo tenemos que hacer porque se pierde el id al eliminarlo y necesitamos mandarselo al resolver
+  // }
+
 }
