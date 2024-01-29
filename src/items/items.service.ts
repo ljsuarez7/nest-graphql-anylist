@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateItemInput, UpdateItemInput } from './dto/inputs';
 import { Item } from './entities/item.entity';
-import { Repository } from 'typeorm';
+import { Like, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/users/entities/user.entity';
+import { PaginationArgs, SearchArgs } from 'src/common/dto/args';
 
 @Injectable()
 export class ItemsService {
@@ -18,15 +19,34 @@ export class ItemsService {
     return await this.itemsRepository.save(newItem);
   }
 
-  async findAll(user: User): Promise<Item[]> {
-    // TODO: filtrar, paginar, por usuario...    
-    return this.itemsRepository.find({
-      where: {
-        user: {
-          id: user.id
-        }
-      }
-    });
+  async findAll(user: User, paginationArgs: PaginationArgs, searchArgs: SearchArgs): Promise<Item[]> {
+
+    const {limit, offset} = paginationArgs;
+    const {search} = searchArgs;
+
+    const queryBuilder = this.itemsRepository.createQueryBuilder()
+      .take(limit)
+      .skip(offset)
+      .where(`"userId" = :userId`, {userId: user.id});
+
+    if(search){
+      queryBuilder.andWhere('LOWER(name) like :name', {name: `%${search.toLowerCase()}%`})
+    }
+
+    return queryBuilder.getMany();
+
+    //Es lo mismo que la consulta de arriba, pero la de arriba es más simple y resuelve algunos problemas como que la busqueda no sea case sensitive y q el search sea opcional y no pete
+    // return this.itemsRepository.find({
+    //   take: limit,
+    //   skip: offset,
+    //   where: {
+    //     user: {
+    //       id: user.id
+    //     },
+    //     name: Like(`%${search}%`)
+    //   }
+    // });
+
   }
 
   async findOne(id: string, user: User): Promise<Item> {
