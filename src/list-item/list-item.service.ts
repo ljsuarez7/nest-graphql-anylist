@@ -26,7 +26,10 @@ export class ListItemService {
       list: {id: listId},
     });
 
-    return this.listItemRepository.save(newListItem);
+    await this.listItemRepository.save(newListItem);
+
+    //Esto lo hacemos para que cargue toda la info de las relaciones
+    return this.findOne(newListItem.id);
 
   }
 
