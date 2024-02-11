@@ -29,9 +29,7 @@ export class ItemsResolver {
     @CurrentUser() user: User,
     @Args() paginationArgs: PaginationArgs,
     @Args() searchArgs: SearchArgs
-  ): Promise<Item[]> {
-    console.log({paginationArgs, searchArgs});
-    
+  ): Promise<Item[]> {    
     return this.itemsService.findAll(user, paginationArgs, searchArgs);
   }
 
